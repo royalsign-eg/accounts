@@ -623,12 +623,15 @@ function reportData(){
   let rows=allLines().filter(r=>(rep.type==='all'||r.kind===rep.type)&&(!rep.proj||(rep.proj==='__none'?!r.proj:r.proj===rep.proj))
     &&(!rep.party||r.party===rep.party)&&(!rep.from||r.date>=rep.from)&&(!rep.to||r.date<=rep.to)&&(!q||norm(r.name).includes(q)));
   rows.sort((a,b)=>b.date.localeCompare(a.date));
+  return {rows,groups:makeGroups(rows)};
+}
+function makeGroups(rows){
   const keyOf={item:r=>norm(r.name)+'|'+r.unit,project:r=>r.projName,party:r=>(r.kind==='sale'?'':'مورد: ')+r.partyName,month:r=>r.date.slice(0,7)||'—'}[rep.group];
   const g={};rows.forEach(r=>{const k=keyOf(r);const o=g[k]||(g[k]={label:rep.group==='item'?r.name:rep.group==='month'?(r.date?r.date.slice(5,7)+'/'+r.date.slice(0,4):'—'):k,unit:r.unit,units:new Set(),qty:0,total:0,docs:new Set()});
     o.qty+=r.qty;o.total+=r.total;o.units.add(r.unit||'');o.docs.add(r.kind+r.id)});
   let groups=Object.entries(g).map(([k,o])=>({k,...o,mixed:o.units.size>1}));
   groups.sort(rep.group==='month'?(a,b)=>b.k.localeCompare(a.k):(a,b)=>b.total-a.total);
-  return {rows,groups};
+  return groups;
 }
 function finData(){
   if(rep.type==='all')return null;
@@ -644,11 +647,11 @@ function finData(){
   sts.forEach(d=>pays.push({date:d.date,t:`مستخلص ${d.number||''} (استقطاعات ${fmt(num(d.dedTotal))}، صافي ${fmt(num(d.net))})`,who:nameOf('customers',d.customerId),v:num(d.gross),st:1}));
   S.txns.filter(t=>t.kind===kind&&!t.link&&(!rep.party||t.refId===rep.party)&&inP(t.projectId)&&inD(t.date)).forEach(t=>{
     const plus=sale?t.dir==='in':t.dir==='out';pays.push({date:t.date,t:t.note||(plus?'دفعة':'رد مبلغ'),who:nameOf(sale?'customers':'suppliers',t.refId),v:plus?num(t.amount):-num(t.amount)})});
-  let trIn=0;
+  let trIn=0;const trList=[];
   if(sale&&rep.party)S.transfers.filter(t=>(t.fromId===rep.party||t.toId===rep.party)&&inP(t.projectId)&&inD(t.date)).forEach(t=>{
-    if(t.fromId===rep.party)pays.push({date:t.date,t:`شهادة أعمال ${t.number||''} منقولة إلى ${nameOf('customers',t.toId)}`,who:'',v:num(t.amount)});else trIn+=num(t.amount)});
+    if(t.fromId===rep.party)pays.push({date:t.date,t:`شهادة أعمال ${t.number||''} منقولة إلى ${nameOf('customers',t.toId)}`,who:'',v:num(t.amount)});else{trIn+=num(t.amount);trList.push(t)}});
   pays.sort((a,b)=>(a.date||'').localeCompare(b.date||''));
-  const f={sale,trIn,invCount:invs.length,stCount:sts.length,opening,
+  const f={sale,trIn,trList,invCount:invs.length,stCount:sts.length,opening,
     sub:sum(invs,d=>num(d.subtotal!=null?d.subtotal:d.amount)),disc:sum(invs,d=>num(d.discAmt)),vat:sum(invs,d=>num(d.vatAmt)),wht:sum(invs,d=>num(d.whtAmt)),invNet:sum(invs,d=>num(d.amount)),
     stGross:sum(sts,d=>num(d.gross)),stDed:sum(sts,d=>num(d.dedTotal)),stNet:sum(sts,d=>num(d.net)),pays};
   f.due=f.opening+f.invNet+f.trIn;f.stPaid=sum(pays.filter(p=>p.st),p=>p.v);f.other=sum(pays.filter(p=>!p.st),p=>p.v);f.paid=f.stPaid+f.other;f.rem=f.due-f.paid;
@@ -661,14 +664,15 @@ function finHTML(f,pr){
   const who=f.sale?'الجهة / العميل':'المورد';
   return `${pr?'<h2>الموقف المالي</h2>':`<div class="sec"><h2>الموقف المالي</h2></div>`}
   <div class="${pr?'box':'card'}">
-    ${row('رصيد افتتاحي',f.opening)}${row('(+) شهادات أعمال منقولة من عملاء تانيين',f.trIn)}
+    ${row('رصيد افتتاحي',f.opening)}
     ${f.invCount?row(`إجمالي ${f.sale?'المبيعات':'المشتريات'} (${f.invCount} فاتورة)`,f.sub)+row('(−) خصومات',f.disc)+row('(+) ضريبة قيمة مضافة',f.vat)+row('(−) ضريبة خصم وإضافة',f.wht):''}
+    ${(f.trList||[]).map(t=>row(`(+) شهادة أعمال${t.number?' رقم '+esc(t.number):''} منقولة من ${esc(nameOf('customers',t.fromId))}${t.date?' — '+fdate(t.date):''}${t.projectId?' ('+esc(nameOf('projects',t.projectId))+')':''}`,num(t.amount))).join('')}
     <div class="sum tot"><span>صافي المستحق</span><b>${m(f.due)}</b></div>
     ${f.stCount?`<div class="sum"><span>(−) المستخلصات (${f.stCount})</span><b class="pos">${m(f.stPaid)}</b></div>`:''}
     ${f.other||!f.stCount?`<div class="sum"><span>(−) ${f.sale?(f.stCount?'دفعات تانية':'الدفعات المحصّلة من '+who):'المدفوع لـ'+who}</span><b class="pos">${m(f.other)}</b></div>`:''}
     <div class="sum tot"><span>${f.rem>=0?(f.sale?'المتبقي على '+who:'المتبقي لـ'+who):(f.sale?'مدفوع زيادة من '+who:'مدفوع زيادة لـ'+who)}</span><b class="${f.rem>0.004?'neg':''}">${m(Math.abs(f.rem))}</b></div>
   </div>
-  ${f.stCount?`<div class="${pr?'box':'card'}"><b>من المستخلصات</b>${row('إجمالي المستخلصات',f.stGross)}${row('(−) الاستقطاعات',f.stDed)}${row('دخل الصندوق',f.stColl)}${row('اتصرف في الشغل (خارج الصندوق)',f.stOff)}${f.stPend>0.004?row('صافي لسه متحصّلش',f.stPend,'neg'):''}</div>`:''}
+  ${f.stCount?`<div class="${pr?'box':'card'}"><b>من المستخلصات</b>${row('إجمالي المستخلصات',f.stGross)}${row('(−) الاستقطاعات',f.stDed)}${row('دخل الصندوق',f.stColl)}${f.stPend>0.004?row('صافي لسه متحصّلش',f.stPend,'neg'):''}</div>`:''}
   ${f.pays.length?`${pr?'<h4>المستخلصات والدفعات</h4>':'<div class="sec"><h2>المستخلصات والدفعات ('+f.pays.length+')</h2></div>'}
   <div style="overflow-x:auto"><table class="led"><thead><tr><th>التاريخ</th><th>البيان</th>${rep.party?'':'<th>الاسم</th>'}<th>المبلغ</th></tr></thead><tbody>
     ${f.pays.map(p=>`<tr><td class="n">${esc(fdate(p.date))}</td><td>${esc(p.t)}</td>${rep.party?'':`<td>${esc(p.who)}</td>`}<td class="n">${m(p.v)}</td></tr>`).join('')}
@@ -681,9 +685,20 @@ function summaryHTML(pr){
   const units=new Set(rows.map(r=>r.unit||'')),showQty=rep.group==='item'||(!!rep.item&&units.size===1),tv=sum(rows,r=>r.total),tq=sum(rows,r=>r.qty);
   const m=pr?fmt:money;
   if(!rows.length)return '';
+  const cols=1+(showQty?1:0)+(rep.group==='item'?1:0)+2;
+  const line=x=>`<tr><td>${esc(x.label)}</td>${showQty?`<td class="n">${x.mixed?'وحدات مختلفة':`${fmt(x.qty)} ${esc([...x.units][0]||'')}`}</td>`:''}${rep.group==='item'?`<td class="n">${x.qty&&!x.mixed?m(x.total/x.qty):'—'}</td>`:''}<td class="n"><b>${m(x.total)}</b></td><td class="n">${x.docs.size}</td></tr>`;
+  let body;
+  if(rep.group==='project')body=groups.map(line).join('');
+  else{
+    const byP={};rows.forEach(r=>(byP[r.projName]=byP[r.projName]||[]).push(r));
+    const names=Object.keys(byP).sort((a,b)=>a==='بدون مشروع'?1:b==='بدون مشروع'?-1:a.localeCompare(b,'ar'));
+    body=names.map(n=>{const pr_=byP[n],u=new Set(pr_.map(r=>r.unit||''));
+      return `<tr style="background:var(--pri-l,#e3f1ed)"><td colspan="${cols}" style="font-weight:800;color:var(--pri,#0e6656)">📁 ${esc(n)}</td></tr>`+makeGroups(pr_).map(line).join('')+
+        `<tr style="font-weight:700;background:#fafbfb"><td>إجمالي ${esc(n)}</td>${showQty?`<td class="n">${u.size===1?fmt(sum(pr_,r=>r.qty))+' '+esc([...u][0]):''}</td>`:''}${rep.group==='item'?'<td></td>':''}<td class="n">${m(sum(pr_,r=>r.total))}</td><td class="n">${new Set(pr_.map(r=>r.kind+r.id)).size}</td></tr>`}).join('');
+  }
   return `${pr?`<h2>ملخص الأعمال حسب ${gl}</h2>`:''}<div style="overflow-x:auto"><table class="led"><thead><tr><th>${gl}</th>${showQty?'<th>الكمية</th>':''}${rep.group==='item'?'<th>متوسط السعر</th>':''}<th>القيمة</th><th>فواتير</th></tr></thead><tbody>
-    ${groups.map(x=>`<tr><td>${esc(x.label)}</td>${showQty?`<td class="n">${x.mixed?'وحدات مختلفة':`${fmt(x.qty)} ${esc([...x.units][0]||'')}`}</td>`:''}${rep.group==='item'?`<td class="n">${x.qty&&!x.mixed?m(x.total/x.qty):'—'}</td>`:''}<td class="n"><b>${m(x.total)}</b></td><td class="n">${x.docs.size}</td></tr>`).join('')}
-    <tr style="background:#f6f8f7;font-weight:800"><td>الإجمالي</td>${showQty?`<td class="n">${units.size===1?fmt(tq)+' '+esc([...units][0]):''}</td>`:''}${rep.group==='item'?'<td></td>':''}<td class="n">${m(tv)}</td><td class="n">${new Set(rows.map(r=>r.kind+r.id)).size}</td></tr></tbody></table></div>
+    ${body}
+    <tr style="background:#e8efec;font-weight:800;border-top:2px solid #0e6656"><td>الإجمالي العام</td>${showQty?`<td class="n">${units.size===1?fmt(tq)+' '+esc([...units][0]):''}</td>`:''}${rep.group==='item'?'<td></td>':''}<td class="n">${m(tv)}</td><td class="n">${new Set(rows.map(r=>r.kind+r.id)).size}</td></tr></tbody></table></div>
   <div class="hint" style="margin:8px 2px 0">قيم الأصناف قبل الخصم والضرايب.</div>`;
 }
 function reportView(){
@@ -703,9 +718,6 @@ function reportView(){
     ${rep.item||rep.proj||rep.party||rep.from||rep.to?`<button class="btn ghost sm" data-act="rclear" style="margin:0 0 12px">مسح الفلاتر</button>`:''}
   </div>
   <div class="acts"><button class="btn" data-act="rprint">🖨 طباعة / PDF</button><button class="btn ghost" data-act="rcopy">نسخ التقرير</button></div>
-  ${f?`<div class="grid2">
-    <div class="stat"><div class="lbl">صافي المستحق</div><div class="v">${money(f.due)}</div></div>
-    <div class="stat"><div class="lbl">${f.sale?'المتبقي على الجهة':'المتبقي للمورد'}</div><div class="v ${f.rem>0.004?'neg':'pos'}">${money(f.rem)}</div></div></div>`:''}
   ${rows.length?`<div class="sec"><h2>ملخص الأعمال حسب ${({item:'الصنف',project:'المشروع',party:'العميل / المورد',month:'الشهر'})[rep.group]}</h2><span class="hint" style="margin:0">${rep.item&&units.size===1?fmt(tq)+' '+esc([...units][0])+' • ':''}${fmt(tv)}</span></div>${summaryHTML(false)}`
     :`<div class="list"><div class="empty">${S.sales.length+S.purchases.length?'مفيش أصناف للفلاتر دي.':'لسه مفيش فواتير بيع أو شراء.'}</div></div>`}
   ${finHTML(f,false)}
@@ -716,8 +728,7 @@ function reportView(){
 }
 function reportPrint(){
   const f=finData(),{rows}=reportData();
-  return (f?`<div class="grid2"><div class="stat"><div class="lbl">صافي المستحق</div><div class="v">${fmt(f.due)}</div></div><div class="stat"><div class="lbl">${f.sale?'المتبقي على الجهة':'المتبقي للمورد'}</div><div class="v">${fmt(f.rem)}</div></div></div>`:'')
-    +(rows.length?summaryHTML(true):'')+finHTML(f,true);
+  return (rows.length?summaryHTML(true):'')+finHTML(f,true);
 }
 function reportTitle(){
   const parts=[rep.item?`حصر ${rep.item}`:(rep.type==='purchase'?'موقف مالي مشتريات':rep.type==='sale'?'موقف مالي':'تقرير المبيعات والمشتريات')];
@@ -1280,7 +1291,7 @@ function partyDetail(c,id){
       S.transfers.filter(t=>t.fromId===id||t.toId===id).forEach(t=>{const out=t.fromId===id;rows.push({date:t.date,d:out?0:num(t.amount),c:out?num(t.amount):0,
         t:`شهادة أعمال ${t.number||''} ${out?'منقولة إلى ':'منقولة من '}${nameOf('customers',out?t.toId:t.fromId)}`,sub:t.note||'',ca:t.createdAt,act:'editTr',aid:t.id})});
       S.sales.filter(s=>s.customerId===id).forEach(s=>rows.push({date:s.date,d:num(s.amount),c:0,t:`فاتورة بيع ${s.number||''}`,sub:s.note||'',ca:s.createdAt,act:'editSale',aid:s.id}));
-      sts.forEach(s=>rows.push({date:s.date,d:0,c:stSettled(s),t:`مستخلص ${s.number||''}`,sub:`استقطاعات ${fmt(num(s.dedTotal))} • ${s.offCash?'اتصرف في الشغل (خارج الصندوق)':`دخل الصندوق ${fmt(num(s.collected))}${stPending(s)>0.004?` • صافي لسه متحصّلش ${fmt(stPending(s))}`:''}`}`,ca:s.createdAt,act:'editSt',aid:s.id}));
+      sts.forEach(s=>rows.push({date:s.date,d:0,c:stSettled(s),t:`مستخلص ${s.number||''}`,sub:`استقطاعات ${fmt(num(s.dedTotal))}${s.offCash?'':` • دخل الصندوق ${fmt(num(s.collected))}${stPending(s)>0.004?` • صافي لسه متحصّلش ${fmt(stPending(s))}`:''}`}`,ca:s.createdAt,act:'editSt',aid:s.id}));
       partyTx('customer',id).filter(t=>t.link!=='statements').forEach(t=>rows.push({date:t.date,d:t.dir==='out'?num(t.amount):0,c:t.dir==='in'?num(t.amount):0,t:t.note||(t.dir==='in'?'تحصيل':'رد مبلغ'),ca:(t.createdAt||0)+1,act:'editTxn',aid:t.id}));
       const br=dedBreakdown(sts);
       if(br.length)extra=`<div class="box"><h4>تفصيلة الاستقطاعات على العميل ده</h4>${br.map(([k,v])=>`<div class="sum"><span>${esc(k)}</span><b>${money(v)}</b></div>`).join('')}
