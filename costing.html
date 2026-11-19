@@ -310,16 +310,18 @@ window.__STANDALONE=true;
       LS.set('sb_url',u);LS.set('sb_key',k);location.reload()}}
   function showLogin(msg){gate.classList.add('show');
     box.innerHTML=`<h2>تسجيل الدخول</h2><p>ادخل بالإيميل والباسورد بتوعك.</p>
-      <label>الإيميل<input id="sbE" type="email" autocomplete="username" inputmode="email" value="${(LS.get('sb_user')||'').replace(/"/g,'')}"></label>
-      <label>كلمة السر<input id="sbP" type="password" autocomplete="current-password"></label>
+      <label>الإيميل<input id="sbE" type="email" autocomplete="username" inputmode="email" autocapitalize="none" autocorrect="off" spellcheck="false" value="${(LS.get('sb_user')||'').replace(/"/g,'')}"></label>
+      <label>كلمة السر<span style="position:relative;display:block"><input id="sbP" type="password" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" style="padding-left:52px">
+        <button type="button" id="sbEye" style="position:absolute;left:6px;top:50%;transform:translateY(-38%);width:auto;margin:0;padding:6px 10px;background:#eef2f0;color:#16211e;font-size:15px">👁</button></span></label>
       <button id="sbIn">دخول</button><div class="er">${msg||''}</div>
       ${isReady?'<button class="lnk" id="sbLater">بعدين — كمّل على البيانات اللي على الموبايل</button>':''}
       ${SB_URL?'':'<button class="lnk" id="sbReset">تغيير بيانات الربط</button>'}`;
     const btn=box.querySelector('#sbIn'),er=box.querySelector('.er');
     const go=async()=>{if(!navigator.onLine){er.textContent='محتاج نت عشان تسجّل دخول';return}btn.disabled=true;er.textContent='';
-      const {error}=await client.auth.signInWithPassword({email:box.querySelector('#sbE').value.trim(),password:box.querySelector('#sbP').value});
+      const {error}=await client.auth.signInWithPassword({email:box.querySelector('#sbE').value.trim().toLowerCase(),password:box.querySelector('#sbP').value});
       btn.disabled=false;if(error)er.textContent=/Invalid login/i.test(error.message)?'الإيميل أو كلمة السر غلط':'مقدرتش أدخل: '+error.message};
     btn.onclick=go;box.querySelector('#sbP').onkeydown=e=>{if(e.key==='Enter')go()};
+    box.querySelector('#sbEye').onclick=()=>{const p=box.querySelector('#sbP');p.type=p.type==='password'?'text':'password'};
     const lt=box.querySelector('#sbLater');if(lt)lt.onclick=()=>gate.classList.remove('show');
     const rs=box.querySelector('#sbReset');if(rs)rs.onclick=()=>{LS.del('sb_url');LS.del('sb_key');location.reload()}}
 
