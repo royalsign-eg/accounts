@@ -560,11 +560,16 @@ function txRow(t){
 
 const V={
 home(){
-  const cb=cashBal(),cap=sum(S.partners,p=>partnerPaid(p.id));
-  const rec=sum(S.customers,c=>Math.max(0,custBal(c.id))),pay=sum(S.suppliers,s=>Math.max(0,supBal(s.id)));
-  const ded=sum(S.statements,s=>num(s.dedTotal));
+  const cb=cashBal();
   const tin=sum(S.txns.filter(t=>t.dir==='in'),t=>num(t.amount)),tout=sum(S.txns.filter(t=>t.dir==='out'),t=>num(t.amount));
   const recent=[...S.txns].sort(byDateDesc).slice(0,8);
+  const accts=(col,bal)=>{const all=S[col].map(p=>({p,b:bal(p.id)}));const nz=all.filter(x=>Math.abs(x.b)>0.004).sort((a,b)=>b.b-a.b);
+    return {list:(nz.length?nz:all).slice(0,6),total:sum(all,x=>x.b),count:all.length,more:Math.max(0,(nz.length?nz:all).length-6)}};
+  const row=(col,{p,b})=>{const isC=col==='customers';
+    return `<button class="row" data-act="openParty" data-t="${col}" data-id="${esc(p.id)}"><div class="dot ic ${isC?'in':'warn'}">${esc((p.name||'?').trim()[0]||'?')}</div>
+      <div class="m"><div class="ttl">${esc(p.name)}</div><div class="s">${esc(p.phone||'')}</div></div>
+      <div class="a ${b>0.004?(isC?'pos':'neg'):''}">${money(Math.abs(b))}<small>${b>0.004?(isC?'عليه':'له'):b<-0.004?(isC?'له':'لينا عنده'):'خالص'}</small></div></button>`};
+  const C=accts('customers',custBal),Sp=accts('suppliers',supBal);
   return `<div class="card hero"><div class="lbl">رصيد الصندوق</div><div class="big">${money(cb)}</div>
     <div class="sub"><span>وارد ${money(tin)}</span><span>منصرف ${money(tout)}</span></div></div>
   <div class="qa">
@@ -574,18 +579,15 @@ home(){
     <button data-act="addSale"><span class="ic in">${I.tag}</span>فاتورة بيع</button>
     <button data-act="addPu"><span class="ic warn">${I.cart}</span>فاتورة شراء</button>
   </div>
-  <div class="grid2" style="margin-top:12px">
-    <div class="stat"><div class="lbl">إجمالي المبيعات</div><div class="v">${money(sum(S.sales,s=>num(s.amount)))}</div></div>
-    <div class="stat"><div class="lbl">رأس مال الشركاء</div><div class="v">${money(cap)}</div></div>
-    <div class="stat"><div class="lbl">مستحق على العملاء</div><div class="v pos">${money(rec)}</div></div>
-    <div class="stat"><div class="lbl">مستحق للموردين</div><div class="v neg">${money(pay)}</div></div>
-    <div class="stat"><div class="lbl">إجمالي الاستقطاعات</div><div class="v" style="color:var(--warn)">${money(ded)}</div></div>
-    <div class="stat"><div class="lbl">إجمالي المشتريات</div><div class="v">${money(sum(S.purchases,s=>num(s.amount)))}</div></div>
-  </div>
-  ${S.statements.length?`<div class="sec"><h2>آخر المستخلصات</h2><button class="lnk" data-act="goSt">عرض الكل</button></div>
-  <div class="list">${[...S.statements].sort(byDateDesc).slice(0,3).map(stRow).join('')}</div>`:''}
-  <div class="sec"><h2>آخر حركات الصندوق</h2><button class="lnk" data-act="nav" data-v="cash">عرض الكل</button></div>
-  <div class="list">${recent.length?recent.map(txRow).join(''):`<div class="empty">لسه مفيش حركات. ابدأ بإضافة الشركاء ورأس المال، أو سجّل أول وارد.</div>`}</div>
+
+  <div class="sec"><h2>حسابات العملاء <span class="hint" style="margin:0;font-weight:600">• المستحق ${fmt(C.total)}</span></h2><button class="lnk" data-act="nav" data-v="customers">عرض الكل${C.count?' ('+C.count+')':''}</button></div>
+  <div class="list">${C.list.length?C.list.map(x=>row('customers',x)).join('')+(C.more?`<button class="row" data-act="nav" data-v="customers" style="justify-content:center;color:var(--pri);font-weight:700">+ ${C.more} عميل تاني</button>`:''):`<div class="empty">لسه مفيش عملاء.</div>`}</div>
+
+  <div class="sec"><h2>حركات الصندوق</h2><button class="lnk" data-act="nav" data-v="cash">عرض الكل</button></div>
+  <div class="list">${recent.length?recent.map(txRow).join(''):`<div class="empty">لسه مفيش حركات. سجّل أول وارد أو منصرف.</div>`}</div>
+
+  <div class="sec"><h2>حسابات الموردين <span class="hint" style="margin:0;font-weight:600">• المستحق ${fmt(Sp.total)}</span></h2><button class="lnk" data-act="nav" data-v="suppliers">عرض الكل${Sp.count?' ('+Sp.count+')':''}</button></div>
+  <div class="list">${Sp.list.length?Sp.list.map(x=>row('suppliers',x)).join('')+(Sp.more?`<button class="row" data-act="nav" data-v="suppliers" style="justify-content:center;color:var(--pri);font-weight:700">+ ${Sp.more} مورد تاني</button>`:''):`<div class="empty">لسه مفيش موردين.</div>`}</div>
   ${backupCard()}`;
 },
 cash(){
