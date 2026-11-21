@@ -1784,14 +1784,14 @@ function itemDetail(id){
         <div class="sum"><span>الكمية المباعة</span><b>${fmtQ(p.qty)} ${esc(it.unit||'')}</b></div><div class="sum"><span>إجمالي المبيعات</span><b>${money(p.rev)}</b></div>
         <div class="sum"><span>(−) التكلفة</span><b>${money(p.cost)}</b></div><div class="sum tot"><span>الربح</span><b class="${p.profit<0?'neg':'pos'}">${money(p.profit)}</b></div>
         <div class="sum"><span>هامش الربح</span><b>${fmt(p.margin)}%</b></div><div class="sum"><span>متوسط سعر البيع للوحدة</span><b>${money(p.qty?p.rev/p.qty:0)}</b></div></div>`:''})()}
-      <div class="acts">${it.kind==='product'?`<button class="btn" data-act="addMfg" data-p="${esc(id)}">🏭 تصنيع</button>`:''}<button class="btn ghost" data-act="addAdj" data-i="${esc(id)}">⚖ تسوية / جرد</button><button class="btn ghost" data-act="editItem" data-id="${esc(id)}">تعديل</button></div>
+      <div class="acts">${it.kind==='product'?`<button class="btn" data-act="addMfg" data-p="${esc(id)}">🏭 تصنيع</button>`:''}<button class="btn ghost" data-act="addAdj" data-i="${esc(id)}">⚖ تسوية / جرد</button><button class="btn ghost" data-act="editStockItem" data-id="${esc(id)}">تعديل</button></div>
       <h4 style="margin:6px 2px 8px">حركة الصنف</h4>
       ${rows?`<div style="overflow-x:auto"><table class="led"><thead><tr><th>التاريخ</th><th>البيان</th><th>وارد</th><th>صادر</th><th>الرصيد</th></tr></thead><tbody>${rows}</tbody></table></div><div class="hint" style="margin-top:8px">دوس على أي سطر يفتح الفاتورة أو أمر التصنيع بتاعه.</div>`:'<div class="empty">مفيش حركة لسه.</div>'}
       ${it.notes?`<div class="hint" style="margin-top:10px">${esc(it.notes)}</div>`:''}</div>`);
     return {title:it.name,body,live:true};
   };
 }
-function itemForm(x,pre={}){
+function stockItemForm(x,pre={}){
   return ()=>{
     const v=x?{...x}:{name:pre.name||'',kind:pre.kind||'raw',unit:'',buyUnit:'',buyFactor:'',openingQty:'',openingCost:'',minQty:'',notes:''};
     const b=el(`<div class="form">
@@ -1852,7 +1852,7 @@ function adjForm(x,pre={}){
 function mfgForm(x,pre={}){
   return ()=>{
     const prods=S.items.filter(i=>i.kind==='product');
-    if(!prods.length){const b=el('<div><div class="empty">لازم تعرّف المنتج الأول كصنف من نوع "منتج".</div></div>');const go=el('<button class="btn">إضافة منتج</button>');go.onclick=()=>{stack.pop();pushSheet(itemForm(null,{kind:'product'}))};return{title:'أمر تصنيع',body:b,foot:[go]}}
+    if(!prods.length){const b=el('<div><div class="empty">لازم تعرّف المنتج الأول كصنف من نوع "منتج".</div></div>');const go=el('<button class="btn">إضافة منتج</button>');go.onclick=()=>{stack.pop();pushSheet(stockItemForm(null,{kind:'product'}))};return{title:'أمر تصنيع',body:b,foot:[go]}}
     const v=x?{...x,inputs:(x.inputs||[]).map(i=>({...i}))}:{productId:pre.product||'',qty:'',date:today(),number:String(S.mfg.length+1),inputs:[{itemId:'',qty:''}],extra:'',note:'',projectId:''};
     const own=id=>x?sum((x.inputs||[]).filter(i=>i.itemId===id),i=>num(i.qty)):0;
     const b=el(`<div class="form">
@@ -1910,7 +1910,7 @@ const A={
   closeAll:()=>closeAll(),
   back:()=>popSheet(),
   fab:()=>{if(view==='reports')return;({home:()=>pushSheet(txnForm(null,{dir:'out'})),cash:()=>pushSheet(txnForm(null,{dir:'out'})),statements:()=>pushSheet(salesTab==='inv'?saleForm():salesTab==='proj'?projForm():stForm()),
-    customers:()=>pushSheet(partyForm('customers')),suppliers:()=>pushSheet(partyForm('suppliers')),partners:()=>pushSheet(partyForm('partners')),employees:()=>pushSheet(empForm()),stock:()=>pushSheet(stockTab==='mfg'?mfgForm():itemForm())})[view]()},
+    customers:()=>pushSheet(partyForm('customers')),suppliers:()=>pushSheet(partyForm('suppliers')),partners:()=>pushSheet(partyForm('partners')),employees:()=>pushSheet(empForm()),stock:()=>pushSheet(stockTab==='mfg'?mfgForm():stockItemForm())})[view]()},
   addTxn:d=>pushSheet(txnForm(null,{dir:d.dir,kind:d.kind,ref:d.ref})),
   editTxn:d=>{const t=find('txns',d.id);if(!t)return;
     if(t.link==='statements'){const s=find('statements',t.linkId);if(s){toast('الحركة دي جاية من مستخلص — عدّلها من هنا');return pushSheet(stForm(s))}}
@@ -1938,7 +1938,7 @@ const A={
     return{title:'بداية المخزن',body:b,foot:[s]}}),
   skind:d=>{stockKind=d.v;render()},
   openItem:d=>pushSheet(itemDetail(d.id)),
-  editItem:d=>{const it=find('items',d.id);it&&pushSheet(itemForm(it))},
+  editStockItem:d=>{const it=find('items',d.id);it&&pushSheet(stockItemForm(it))},
   addAdj:d=>pushSheet(adjForm(null,{item:d.i})),
   editAdj:d=>{const a=find('stockAdj',d.id);a&&pushSheet(adjForm(a))},
   addMfg:d=>pushSheet(mfgForm(null,{product:d.p})),
