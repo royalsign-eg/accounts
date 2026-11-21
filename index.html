@@ -28,9 +28,9 @@ header h1{margin:0;font-size:20px;font-weight:800}
 main{padding:14px 14px calc(96px + env(safe-area-inset-bottom));max-width:720px;margin:0 auto}
 
 nav{position:fixed;bottom:0;inset-inline:0;z-index:6;background:#fff;border-top:1px solid var(--line);
-  display:grid;grid-template-columns:repeat(7,1fr);padding:6px 2px calc(6px + env(safe-area-inset-bottom))}
+  display:grid;grid-template-columns:repeat(8,1fr);padding:6px 1px calc(6px + env(safe-area-inset-bottom))}
 nav button{background:none;border:0;display:flex;flex-direction:column;align-items:center;gap:2px;
-  font-size:10px;font-weight:600;color:var(--muted);padding:4px 0;white-space:nowrap;border-radius:10px}
+  font-size:9.5px;font-weight:600;color:var(--muted);padding:4px 0;white-space:nowrap;letter-spacing:-.2px;border-radius:10px}
 nav button.on{color:var(--pri)}
 nav button.on svg{stroke-width:2.3}
 
@@ -429,7 +429,7 @@ window.__STANDALONE=true;
 <datalist id="units"><option value="قطعة"><option value="طن"><option value="كجم"><option value="م³"><option value="م²"><option value="م.ط"><option value="شيكارة"><option value="لتر"><option value="علبة"><option value="كرتونة"><option value="وحدة"><option value="مقطوعية"></datalist>
 <datalist id="cats">
   <option value="مشتريات نقدية"><option value="مصروفات نثرية"><option value="مرتبات وأجور"><option value="نقل ومواصلات">
-  <option value="إيجار"><option value="كهرباء ومياه"><option value="صيانة"><option value="عُهدة">
+  <option value="إيجار"><option value="كهرباء ومياه"><option value="صيانة"><option value="عُهدة"><option value="سلف موظفين"><option value="مكافآت ومنح">
 </datalist>
 
 <script>
@@ -448,6 +448,7 @@ const I={
   up:'<svg viewBox="0 0 24 24"><path d="M12 19V5M6 11l6-6 6 6"/></svg>',
   tag:'<svg viewBox="0 0 24 24"><path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1.5"/></svg>',
   chart:'<svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>',
+  badge:'<svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><circle cx="12" cy="10" r="3"/><path d="M7.5 18c.8-2.2 2.5-3.3 4.5-3.3s3.7 1.1 4.5 3.3M10 3v2h4V3"/></svg>',
   cart:'<svg viewBox="0 0 24 24"><path d="M3 4h2l2.5 11h10.5l2-8H6.5"/><circle cx="9" cy="19" r="1.5"/><circle cx="17" cy="19" r="1.5"/></svg>'
 };
 const $=s=>document.querySelector(s);
@@ -466,7 +467,7 @@ const byDateDesc=(a,b)=>(b.date||'').localeCompare(a.date||'')||(b.createdAt||0)
 const byDateAsc=(a,b)=>-byDateDesc(a,b);
 const byName=(a,b)=>(a.name||'').localeCompare(b.name||'','ar');
 
-const COLS=['partners','customers','suppliers','txns','purchases','statements','dedItems','contribs','sales','projects','transfers'];
+const COLS=['partners','customers','suppliers','txns','purchases','statements','dedItems','contribs','sales','projects','transfers','employees','empTx'];
 const S={};COLS.forEach(c=>S[c]=[]);
 const loaded={};
 let db=null,view='home',cashFilter='all',stFilter='all',q={};
@@ -474,7 +475,7 @@ let wFrom='',wTo='',wProfit='',salesTab='st',invFilter='all';
 const KIND={general:'عام',customer:'عميل',supplier:'مورد',partner:'شريك'};
 const KCOL={customer:'customers',supplier:'suppliers',partner:'partners'};
 const VIEWS=[['home','الرئيسية','home'],['cash','الصندوق','cash'],['statements','المبيعات','doc'],
-  ['customers','العملاء','users'],['suppliers','الموردين','truck'],['partners','الشركاء','pie'],['reports','التقارير','chart']];
+  ['customers','العملاء','users'],['suppliers','الموردين','truck'],['employees','الموظفين','badge'],['partners','الشركاء','pie'],['reports','التقارير','chart']];
 
 function find(col,id){return S[col].find(x=>x.id===id)}
 function nameOf(col,id){const x=find(col,id);return x?x.name:'(محذوف)'}
@@ -862,6 +863,7 @@ function stView(){
 Object.assign(V,{
 customers(){return partyList('customers')},
 reports(){return reportView()},
+employees(){return empView()},
 suppliers(){return partyList('suppliers')},
 partners(){
   const data=S.partners.map(p=>({p,bal:partnerPaid(p.id)}));
@@ -1487,7 +1489,7 @@ function backupCard(){
   <div class="card">
     <div class="sum"><span>السجلات المحفوظة</span><b class="num">${fmt(n)}</b></div>
     <div class="hint" style="margin:4px 0 8px">نسخة كاملة على الموبايل، ونسخة أونلاين على Supabase بتتحدّث لوحدها. وكل تعديل أو حذف بيتسجّل في سجل التعديلات.</div>
-    <details style="margin:0 0 8px"><summary style="font-size:13px;font-weight:700;color:var(--pri)">السجلات دي إيه؟</summary><div style="margin-top:6px">${COLS.filter(c=>S[c].length).map(c=>`<div class="sum"><span>${({partners:'الشركاء',customers:'العملاء',suppliers:'الموردين',txns:'حركات الصندوق',purchases:'فواتير الشراء',statements:'المستخلصات',dedItems:'بنود الاستقطاعات',contribs:'مساهمات الشركاء',sales:'فواتير البيع',projects:'المشاريع',transfers:'شهادات الأعمال'})[c]||c}</span><b class="num">${S[c].length}</b></div>`).join('')}</div></details>
+    <details style="margin:0 0 8px"><summary style="font-size:13px;font-weight:700;color:var(--pri)">السجلات دي إيه؟</summary><div style="margin-top:6px">${COLS.filter(c=>S[c].length).map(c=>`<div class="sum"><span>${({partners:'الشركاء',customers:'العملاء',suppliers:'الموردين',txns:'حركات الصندوق',purchases:'فواتير الشراء',statements:'المستخلصات',dedItems:'بنود الاستقطاعات',contribs:'مساهمات الشركاء',sales:'فواتير البيع',projects:'المشاريع',transfers:'شهادات الأعمال',employees:'الموظفين',empTx:'حركات الموظفين'})[c]||c}</span><b class="num">${S[c].length}</b></div>`).join('')}</div></details>
     <div class="sum"><span>آخر نسخة احتياطية</span><b class="${warn?'neg':''}">${lastBackup?(days===0?'النهارده':days===1?'امبارح':`من ${days} يوم`):'لسه ماتعملتش'}</b></div>
     <div class="acts" style="margin:10px 0 0"><button class="btn" data-act="backup">⬇ نسخة احتياطية على الموبايل</button><button class="btn ghost" data-act="restore">⬆ استرجاع</button></div>
   </div>
@@ -1529,6 +1531,157 @@ function doRestore(){
   inp.click();
 }
 
+/* ============ الموظفين والمرتبات ============ */
+const AR_MONTHS=['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+const ymOf=d=>(d||today()).slice(0,7);
+const ymAdd=(ym,k)=>{let [y,m]=ym.split('-').map(Number);m+=k;y+=Math.floor((m-1)/12);m=((m-1)%12+12)%12+1;return `${y}-${String(m).padStart(2,'0')}`};
+const ymName=ym=>{if(!ym)return '';const [y,m]=ym.split('-');return `${AR_MONTHS[+m-1]} ${y}`};
+let payMonth=ymOf(today());
+const ET={advance:'سلفة',bonus:'مكافأة',grant:'منحة',deduction:'خصم / جزاء',salary:'صرف مرتب'};
+const ETCAT={advance:'سلف موظفين',bonus:'مكافآت ومنح',grant:'مكافآت ومنح',salary:'مرتبات وأجور'};
+const instOf=t=>Math.max(1,Math.round(num(t.installments)||1));
+function advShare(t,ym){const n=instOf(t),s=t.month||ymOf(t.date);for(let i=0;i<n;i++)if(ymAdd(s,i)===ym)return num(t.amount)/n;return 0}
+function payroll(e,ym){
+  const tx=S.empTx.filter(t=>t.empId===e.id),inM=t=>(t.month||ymOf(t.date))===ym;
+  const adv=r2(sum(tx.filter(t=>t.type==='advance'),t=>advShare(t,ym)));
+  const bon=r2(sum(tx.filter(t=>t.type==='bonus'&&!t.paidNow&&inM(t)),t=>num(t.amount)));
+  const gr=r2(sum(tx.filter(t=>t.type==='grant'&&!t.paidNow&&inM(t)),t=>num(t.amount)));
+  const now=r2(sum(tx.filter(t=>(t.type==='bonus'||t.type==='grant')&&t.paidNow&&inM(t)),t=>num(t.amount)));
+  const ded=r2(sum(tx.filter(t=>t.type==='deduction'&&inM(t)),t=>num(t.amount)));
+  const base=num(e.salary),net=r2(base+bon+gr-adv-ded);
+  const pays=tx.filter(t=>t.type==='salary'&&inM(t)),paid=r2(sum(pays,t=>num(t.amount)));
+  return {base,adv,bon,gr,now,ded,net,paid,rem:r2(net-paid),pays};
+}
+function advLeft(e,ym){return r2(sum(S.empTx.filter(t=>t.empId===e.id&&t.type==='advance'),t=>{const n=instOf(t),s=t.month||ymOf(t.date);let l=0;for(let i=0;i<n;i++)if(ymAdd(s,i)>ym)l+=num(t.amount)/n;return l}))}
+const empList=()=>[...S.employees].filter(e=>e.active!==false||S.empTx.some(t=>t.empId===e.id&&(t.month||ymOf(t.date))===payMonth)).sort(byName);
+function payTag(p){return p.paid&&p.rem<=0.004?'<span class="tag ok">اتصرف</span>':p.paid?`<span class="tag warn">باقي ${fmt(p.rem)}</span>`:'<span class="tag warn">لسه ما اتصرفش</span>'}
+function empView(){
+  const P=empList().map(e=>({e,p:payroll(e,payMonth)})),tot=k=>sum(P,x=>x.p[k]);
+  return `<div class="card hero"><div class="lbl">صافي مرتبات ${ymName(payMonth)}</div><div class="big">${money(tot('net'))}</div>
+    <div class="sub"><span>اتصرف ${money(tot('paid'))}</span><span>الباقي ${money(tot('rem'))}</span><span>سلف متخصومة ${money(tot('adv'))}</span></div></div>
+  <div class="acts" style="align-items:center"><button class="btn ghost sm" data-act="pm" data-d="-1">→ الشهر السابق</button><b style="flex:1;text-align:center">${ymName(payMonth)}</b><button class="btn ghost sm" data-act="pm" data-d="1">الشهر التالي ←</button></div>
+  <div class="list">${P.length?P.map(({e,p})=>`<button class="row" data-act="openEmp" data-id="${esc(e.id)}"><div class="dot ic pri">${esc((e.name||'?').trim()[0]||'?')}</div>
+    <div class="m"><div class="ttl">${esc(e.name)}${e.active===false?' <span class="tag">متوقف</span>':''}</div>
+    <div class="s">${esc([e.job,'مرتب '+fmt(p.base),p.adv?'سلف −'+fmt(p.adv):'',p.bon+p.gr?'مكافآت +'+fmt(p.bon+p.gr):'',p.ded?'خصم −'+fmt(p.ded):''].filter(Boolean).join(' • '))}</div>
+    <div style="margin-top:3px">${payTag(p)}</div></div>
+    <div class="a">${money(p.net)}<small>الصافي</small></div></button>`).join(''):'<div class="empty">ضيف الموظفين ومرتب كل واحد من زرار +.</div>'}</div>
+  ${P.length?`<div class="acts" style="margin-top:12px"><button class="btn ghost" data-act="printPayroll">🖨 كشف مرتبات ${ymName(payMonth)}</button></div>`:''}`;
+}
+function empDetail(id){
+  return ()=>{
+    const e=find('employees',id);if(!e)return{title:'محذوف',body:el('<div class="empty">الموظف اتحذف.</div>'),live:true};
+    const p=payroll(e,payMonth),left=advLeft(e,payMonth);
+    const tx=S.empTx.filter(t=>t.empId===id).sort(byDateDesc);
+    const ln=(l,v,c='')=>v?`<div class="sum ${c}"><span>${l}</span><b>${money(v)}</b></div>`:'';
+    const body=el(`<div>
+      <div class="card hero"><div class="lbl">${esc(e.job||'موظف')}</div><div class="big">${money(p.base)}</div><div class="sub"><span>المرتب الشهري</span>${e.phone?`<span class="num">${esc(e.phone)}</span>`:''}${e.startDate?`<span>من ${esc(fdate(e.startDate))}</span>`:''}</div></div>
+      <div class="acts"><button class="btn" data-act="payEmp" data-id="${esc(id)}">💵 صرف مرتب ${ymName(payMonth)}</button></div>
+      <div class="acts"><button class="btn ghost" data-act="addEmpTx" data-t="advance" data-id="${esc(id)}">سلفة</button><button class="btn ghost" data-act="addEmpTx" data-t="bonus" data-id="${esc(id)}">مكافأة</button>
+        <button class="btn ghost" data-act="addEmpTx" data-t="grant" data-id="${esc(id)}">منحة</button><button class="btn ghost" data-act="addEmpTx" data-t="deduction" data-id="${esc(id)}">خصم / جزاء</button></div>
+      <div class="box"><h4>مرتب ${ymName(payMonth)}</h4>
+        ${ln('المرتب الأساسي',p.base)}${ln('(+) مكافآت',p.bon)}${ln('(+) منح',p.gr)}${ln('(−) سلف',p.adv)}${ln('(−) خصومات وجزاءات',p.ded)}
+        <div class="sum tot"><span>الصافي</span><b>${money(p.net)}</b></div>${ln('اتصرف',p.paid,'pos')}
+        <div class="sum tot"><span>${p.rem>=0?'الباقي له':'اتصرف له زيادة'}</span><b class="${p.rem>0.004?'neg':''}">${money(Math.abs(p.rem))}</b></div>
+        ${p.now?`<div class="hint" style="margin:6px 0 0">مكافآت ومنح اتصرفتله فوري الشهر ده: ${fmt(p.now)} (مش داخلة في الصافي)</div>`:''}
+        ${left>0.004?`<div class="hint" style="margin:6px 0 0">باقي سلف هتتخصم في الشهور الجاية: <b>${fmt(left)}</b></div>`:''}</div>
+      <div class="acts"><button class="btn ghost sm" data-act="editEmp" data-id="${esc(id)}">تعديل بيانات الموظف</button></div>
+      <h4 style="margin:6px 2px 8px">كل الحركات</h4>
+      ${tx.length?`<div style="overflow-x:auto"><table class="led"><thead><tr><th>التاريخ</th><th>النوع</th><th>على شهر</th><th>المبلغ</th></tr></thead><tbody>
+        ${tx.map(t=>`<tr class="click" data-act="editEmpTx" data-id="${esc(t.id)}"><td>${esc(fdate(t.date))}</td><td>${ET[t.type]||t.type}${t.type==='advance'&&instOf(t)>1?` (على ${instOf(t)} شهور)`:''}${t.paidNow?' (اتصرفت فوري)':''}${t.note?`<div style="color:var(--muted);font-size:11px">${esc(t.note)}</div>`:''}</td>
+          <td>${esc(ymName(t.month||ymOf(t.date)))}</td><td class="n"><b class="${t.type==='deduction'||t.type==='advance'?'neg':''}">${money(num(t.amount))}</b></td></tr>`).join('')}</tbody></table></div>`
+        :'<div class="empty">مفيش حركات لسه.</div>'}
+      ${e.notes?`<div class="hint" style="margin-top:10px">${esc(e.notes)}</div>`:''}</div>`);
+    return {title:e.name,body,live:true};
+  };
+}
+function empForm(x){
+  return ()=>{
+    const v=x?{...x}:{name:'',job:'',phone:'',salary:'',startDate:today(),notes:'',active:true};
+    const b=el(`<div class="form">
+      <label>الاسم<input name="name" value="${esc(v.name)}"></label>
+      <div class="two"><label>الوظيفة<input name="job" value="${esc(v.job||'')}" placeholder="مثلاً: فني تركيب"></label><label>التليفون<input name="phone" inputmode="tel" value="${esc(v.phone||'')}"></label></div>
+      <div class="two"><label>المرتب الشهري<input name="salary" inputmode="decimal" value="${esc(v.salary)}" placeholder="0"></label><label>تاريخ التعيين<input type="date" name="startDate" value="${esc(v.startDate||'')}"></label></div>
+      ${x?`<label class="chk box" style="margin-bottom:14px!important"><input type="checkbox" name="active" ${v.active!==false?'checked':''}><span>موظف حالي<br><small style="color:var(--muted);font-weight:600">شيل العلامة لو ساب الشغل، وهيختفي من كشف المرتبات</small></span></label>`:''}
+      <label>ملاحظات<textarea name="notes" rows="2">${esc(v.notes||'')}</textarea></label><div class="err"></div></div>`);
+    const err=b.querySelector('.err');
+    const save=async()=>{const name=val(b,'name'),salary=r2(num(val(b,'salary')));
+      if(!name){err.textContent='اكتب الاسم';return}if(salary<0){err.textContent='المرتب غلط';return}
+      const ref=x?col('employees').doc(x.id):col('employees').doc();
+      const act=b.querySelector('[name=active]');
+      if(await run(()=>ref.set({name,job:val(b,'job'),phone:val(b,'phone'),salary,startDate:val(b,'startDate'),notes:val(b,'notes'),active:act?act.checked:true,createdAt:x?.createdAt||Date.now(),updatedAt:Date.now()}))){toast('اتحفظ');popSheet()}};
+    const del=x?async()=>{if(S.empTx.some(t=>t.empId===x.id)){toast('الموظف عليه حركات — شيل علامة "موظف حالي" بدل ما تحذفه');return}
+      if(await confirmBox(`تحذف "${x.name}"؟`)&&await run(()=>col('employees').doc(x.id).delete())){toast('اتحذف');closeAll()}}:null;
+    return {title:x?'تعديل موظف':'موظف جديد',body:b,foot:footBtns(save,del),focus:x?null:'[name=name]'};
+  };
+}
+async function syncEmpCash(id,t){
+  const tref=col('txns').doc('et_'+id),emp=find('employees',t.empId);
+  const cash=t.type==='advance'||t.type==='salary'||((t.type==='bonus'||t.type==='grant')&&t.paidNow);
+  if(cash)await tref.set({dir:'out',amount:num(t.amount),date:t.date,kind:'general',refId:'',category:ETCAT[t.type],
+    note:`${t.type==='salary'?'مرتب '+ymName(t.month):ET[t.type]} — ${emp?emp.name:''}${t.note?' — '+t.note:''}`,link:'empTx',linkId:id,createdAt:t.createdAt,updatedAt:Date.now()});
+  else await tref.delete();
+}
+function empTxForm(x,pre={}){
+  return ()=>{
+    if(!S.employees.length){const b=el('<div><div class="empty">ضيف الموظفين الأول.</div></div>');return{title:'حركة موظف',body:b}}
+    const v=x?{...x}:{empId:pre.emp||'',type:pre.type||'advance',amount:'',date:today(),month:payMonth,installments:1,paidNow:false,note:''};
+    const b=el(`<div class="form">
+      <div class="seg" data-seg="type">${['advance','bonus','grant','deduction'].map(k=>`<button type="button" data-v="${k}">${ET[k]}</button>`).join('')}</div>
+      <label>الموظف<select name="empId">${opts(S.employees.filter(e=>e.active!==false||e.id===v.empId),v.empId)}</select></label>
+      <div class="two"><label>المبلغ<input name="amount" inputmode="decimal" autocomplete="off" value="${esc(v.amount)}" placeholder="0"></label><label>التاريخ<input type="date" name="date" value="${esc(v.date)}"></label></div>
+      <div class="two"><label class="mw">على مرتب شهر<input type="month" name="month" value="${esc(v.month||ymOf(v.date))}"></label>
+        <label class="instw">تتخصم على كام شهر<input name="installments" inputmode="numeric" value="${esc(v.installments||1)}"></label></div>
+      <label class="chk box noww" style="margin-bottom:14px!important"><input type="checkbox" name="paidNow" ${v.paidNow?'checked':''}><span>اتصرفت دلوقتي من الصندوق<br><small style="color:var(--muted);font-weight:600">لو مش متعلّمة، هتتضاف على المرتب وتتصرف معاه</small></span></label>
+      <label>ملاحظات<input name="note" value="${esc(v.note||'')}" placeholder="اختياري"></label>
+      <div class="hint info"></div><div class="err"></div></div>`);
+    let typeV;
+    const sync=()=>{const t=typeV?typeV():v.type,n=Math.max(1,Math.round(num(val(b,'installments'))||1)),a=num(val(b,'amount')),m=val(b,'month')||payMonth;
+      b.querySelector('.instw').style.display=t==='advance'?'':'none';b.querySelector('.noww').style.display=(t==='bonus'||t==='grant')?'':'none';
+      b.querySelector('.mw').firstChild.textContent=t==='advance'?'تبدأ تتخصم من شهر':'على مرتب شهر';
+      b.querySelector('.info').textContent=t==='advance'?`السلفة بتخرج من الصندوق دلوقتي${a?`، وهيتخصم ${fmt(a/n)} من مرتب ${n>1?`كل شهر من ${ymName(m)} لـ ${ymName(ymAdd(m,n-1))}`:ymName(m)}`:''}.`
+        :t==='deduction'?'الخصم بيقلّل صافي المرتب، ومش بيأثر على الصندوق.':b.querySelector('[name=paidNow]').checked?'هتخرج من الصندوق دلوقتي، ومش هتتضاف على المرتب.':`هتتضاف على مرتب ${ymName(m)}.`};
+    typeV=segBind(b,'type',v.type,sync);b.addEventListener('input',sync);b.addEventListener('change',sync);sync();
+    const err=b.querySelector('.err');
+    const save=async()=>{const t=typeV(),empId=val(b,'empId'),amount=r2(num(val(b,'amount')));
+      if(!empId){err.textContent='اختار الموظف';return}if(amount<=0){err.textContent='اكتب المبلغ';return}
+      const data={empId,type:t,amount,date:val(b,'date')||today(),month:val(b,'month')||payMonth,note:val(b,'note'),
+        installments:t==='advance'?Math.max(1,Math.round(num(val(b,'installments'))||1)):1,paidNow:(t==='bonus'||t==='grant')&&b.querySelector('[name=paidNow]').checked,
+        createdAt:x?.createdAt||Date.now(),updatedAt:Date.now()};
+      const ref=x?col('empTx').doc(x.id):col('empTx').doc();
+      if(await run(async()=>{await ref.set(data);await syncEmpCash(ref.id,data)})){toast('اتحفظت');popSheet()}};
+    const del=x?async()=>{if(await confirmBox(`تحذف ${ET[x.type]} دي؟`)&&await run(async()=>{await col('empTx').doc(x.id).delete();await col('txns').doc('et_'+x.id).delete()})){toast('اتحذفت');popSheet()}}:null;
+    return {title:x?'تعديل '+ET[x.type]:'حركة موظف',body:b,foot:footBtns(save,del),focus:x?null:'[name=amount]'};
+  };
+}
+function payForm(empId,ym,x){
+  return ()=>{
+    const e=find('employees',empId);if(!e)return{title:'صرف مرتب',body:el('<div class="empty">الموظف مش موجود.</div>')};
+    const month=x?x.month:ym,p=payroll(e,month),already=x?p.paid-num(x.amount):p.paid,due=r2(p.net-already);
+    const ln=(l,v,c='')=>v?`<div class="sum ${c}"><span>${l}</span><b>${money(v)}</b></div>`:'';
+    const b=el(`<div class="form">
+      <div class="box"><h4>${esc(e.name)} — مرتب ${ymName(month)}</h4>
+        ${ln('المرتب الأساسي',p.base)}${ln('(+) مكافآت',p.bon)}${ln('(+) منح',p.gr)}${ln('(−) سلف',p.adv)}${ln('(−) خصومات وجزاءات',p.ded)}
+        <div class="sum tot"><span>الصافي</span><b>${money(p.net)}</b></div>${ln('اتصرف قبل كده',already,'pos')}
+        <div class="sum tot"><span>المستحق دلوقتي</span><b>${money(due)}</b></div></div>
+      <div class="two"><label>المبلغ المصروف<input name="amount" inputmode="decimal" autocomplete="off" value="${esc(x?x.amount:(due>0?due:''))}"></label><label>التاريخ<input type="date" name="date" value="${esc(x?x.date:today())}"></label></div>
+      <label>ملاحظات<input name="note" value="${esc(x?.note||'')}" placeholder="اختياري"></label>
+      <div class="hint">المبلغ ده هيخرج من الصندوق تحت بند "مرتبات وأجور".</div><div class="err"></div></div>`);
+    const err=b.querySelector('.err');
+    const save=async()=>{const amount=r2(num(val(b,'amount')));if(amount<=0){err.textContent='اكتب المبلغ';return}
+      const data={empId,type:'salary',amount,date:val(b,'date')||today(),month,note:val(b,'note'),installments:1,paidNow:false,createdAt:x?.createdAt||Date.now(),updatedAt:Date.now()};
+      const ref=x?col('empTx').doc(x.id):col('empTx').doc();
+      if(await run(async()=>{await ref.set(data);await syncEmpCash(ref.id,data)})){toast('اتصرف المرتب');popSheet()}};
+    const del=x?async()=>{if(await confirmBox('تحذف صرف المرتب ده؟ المبلغ هيرجع للصندوق.')&&await run(async()=>{await col('empTx').doc(x.id).delete();await col('txns').doc('et_'+x.id).delete()})){toast('اتحذف');popSheet()}}:null;
+    return {title:x?'تعديل صرف مرتب':'صرف مرتب',body:b,foot:footBtns(save,del,'صرف'),focus:x?null:'[name=amount]'};
+  };
+}
+function payrollPrint(){
+  const P=empList().map(e=>({e,p:payroll(e,payMonth)})),t=k=>fmt(sum(P,x=>x.p[k]));
+  return `<table><thead><tr><th>الموظف</th><th>الأساسي</th><th>مكافآت ومنح</th><th>سلف</th><th>خصومات</th><th>الصافي</th><th>اتصرف</th><th>التوقيع</th></tr></thead><tbody>
+    ${P.map(({e,p})=>`<tr><td>${esc(e.name)}${e.job?`<div style="font-size:10px;color:#777">${esc(e.job)}</div>`:''}</td><td class="n">${fmt(p.base)}</td><td class="n">${p.bon+p.gr?fmt(p.bon+p.gr):'—'}</td><td class="n">${p.adv?fmt(p.adv):'—'}</td><td class="n">${p.ded?fmt(p.ded):'—'}</td><td class="n"><b>${fmt(p.net)}</b></td><td class="n">${p.paid?fmt(p.paid):'—'}</td><td style="min-width:90px"></td></tr>`).join('')}
+    <tr style="font-weight:800;background:#e8efec"><td>الإجمالي</td><td class="n">${t('base')}</td><td class="n">${fmt(sum(P,x=>x.p.bon+x.p.gr))}</td><td class="n">${t('adv')}</td><td class="n">${t('ded')}</td><td class="n">${t('net')}</td><td class="n">${t('paid')}</td><td></td></tr></tbody></table>`;
+}
+
 /* ============ الأحداث ============ */
 const A={
   nav:d=>{view=d.v;window.scrollTo(0,0);render()},
@@ -1537,10 +1690,11 @@ const A={
   closeAll:()=>closeAll(),
   back:()=>popSheet(),
   fab:()=>{if(view==='reports')return;({home:()=>pushSheet(txnForm(null,{dir:'out'})),cash:()=>pushSheet(txnForm(null,{dir:'out'})),statements:()=>pushSheet(salesTab==='inv'?saleForm():salesTab==='proj'?projForm():stForm()),
-    customers:()=>pushSheet(partyForm('customers')),suppliers:()=>pushSheet(partyForm('suppliers')),partners:()=>pushSheet(partyForm('partners'))})[view]()},
+    customers:()=>pushSheet(partyForm('customers')),suppliers:()=>pushSheet(partyForm('suppliers')),partners:()=>pushSheet(partyForm('partners')),employees:()=>pushSheet(empForm())})[view]()},
   addTxn:d=>pushSheet(txnForm(null,{dir:d.dir,kind:d.kind,ref:d.ref})),
   editTxn:d=>{const t=find('txns',d.id);if(!t)return;
     if(t.link==='statements'){const s=find('statements',t.linkId);if(s){toast('الحركة دي جاية من مستخلص — عدّلها من هنا');return pushSheet(stForm(s))}}
+    if(t.link==='empTx'){const s=find('empTx',t.linkId);if(s){toast('الحركة دي تبع موظف — عدّلها من هنا');return pushSheet(s.type==='salary'?payForm(s.empId,s.month,s):empTxForm(s))}}
     if(t.link==='sales'){const s=find('sales',t.linkId);if(s){toast('الحركة دي جاية من فاتورة بيع — عدّلها من هنا');return pushSheet(saleForm(s))}}
     if(t.link==='purchases'){const s=find('purchases',t.linkId);if(s){toast('الحركة دي جاية من فاتورة شراء — عدّلها من هنا');return pushSheet(puForm(s))}}
     pushSheet(txnForm(t))},
@@ -1553,6 +1707,13 @@ const A={
   editTr:d=>{const t=find('transfers',d.id);t&&pushSheet(trForm(t))},
   editSale:d=>{const s=find('sales',d.id);s&&pushSheet(saleForm(s))},
   stab:d=>{salesTab=d.v;render()},
+  pm:d=>{payMonth=ymAdd(payMonth,num(d.d));render()},
+  openEmp:d=>pushSheet(empDetail(d.id)),
+  editEmp:d=>{const e=find('employees',d.id);e&&pushSheet(empForm(e))},
+  addEmpTx:d=>pushSheet(empTxForm(null,{emp:d.id,type:d.t})),
+  editEmpTx:d=>{const t=find('empTx',d.id);if(!t)return;pushSheet(t.type==='salary'?payForm(t.empId,t.month,t):empTxForm(t))},
+  payEmp:d=>pushSheet(payForm(d.id,payMonth)),
+  printPayroll:()=>makePdf('كشف مرتبات '+ymName(payMonth),payrollPrint(),''),
   backup:()=>doBackup(),
   signout:()=>window.sbSignOut&&window.sbSignOut(),
   restore:()=>{if(!db){toast('البيانات مش متصلة');return}doRestore()},
