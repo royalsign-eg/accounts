@@ -471,7 +471,7 @@ const byDateDesc=(a,b)=>(b.date||'').localeCompare(a.date||'')||(b.createdAt||0)
 const byDateAsc=(a,b)=>-byDateDesc(a,b);
 const byName=(a,b)=>(a.name||'').localeCompare(b.name||'','ar');
 
-const COLS=['partners','customers','suppliers','txns','purchases','statements','dedItems','contribs','sales','projects','transfers','employees','empTx','items','mfg','stockAdj'];
+const COLS=['partners','customers','suppliers','txns','purchases','statements','dedItems','contribs','sales','projects','transfers','employees','empTx','items','mfg','stockAdj','settings'];
 const S={};COLS.forEach(c=>S[c]=[]);
 const loaded={};
 let db=null,view='home',cashFilter='all',stFilter='all',q={};
@@ -1503,7 +1503,7 @@ function backupCard(){
   <div class="card">
     <div class="sum"><span>السجلات المحفوظة</span><b class="num">${fmt(n)}</b></div>
     <div class="hint" style="margin:4px 0 8px">نسخة كاملة على الموبايل، ونسخة أونلاين على Supabase بتتحدّث لوحدها. وكل تعديل أو حذف بيتسجّل في سجل التعديلات.</div>
-    <details style="margin:0 0 8px"><summary style="font-size:13px;font-weight:700;color:var(--pri)">السجلات دي إيه؟</summary><div style="margin-top:6px">${COLS.filter(c=>S[c].length).map(c=>`<div class="sum"><span>${({partners:'الشركاء',customers:'العملاء',suppliers:'الموردين',txns:'حركات الصندوق',purchases:'فواتير الشراء',statements:'المستخلصات',dedItems:'بنود الاستقطاعات',contribs:'مساهمات الشركاء',sales:'فواتير البيع',projects:'المشاريع',transfers:'شهادات الأعمال',employees:'الموظفين',empTx:'حركات الموظفين',items:'أصناف المخزن',mfg:'أوامر التصنيع',stockAdj:'تسويات المخزن'})[c]||c}</span><b class="num">${S[c].length}</b></div>`).join('')}</div></details>
+    <details style="margin:0 0 8px"><summary style="font-size:13px;font-weight:700;color:var(--pri)">السجلات دي إيه؟</summary><div style="margin-top:6px">${COLS.filter(c=>S[c].length).map(c=>`<div class="sum"><span>${({partners:'الشركاء',customers:'العملاء',suppliers:'الموردين',txns:'حركات الصندوق',purchases:'فواتير الشراء',statements:'المستخلصات',dedItems:'بنود الاستقطاعات',contribs:'مساهمات الشركاء',sales:'فواتير البيع',projects:'المشاريع',transfers:'شهادات الأعمال',employees:'الموظفين',empTx:'حركات الموظفين',items:'أصناف المخزن',mfg:'أوامر التصنيع',stockAdj:'تسويات المخزن',settings:'الإعدادات'})[c]||c}</span><b class="num">${S[c].length}</b></div>`).join('')}</div></details>
     <div class="sum"><span>آخر نسخة احتياطية</span><b class="${warn?'neg':''}">${lastBackup?(days===0?'النهارده':days===1?'امبارح':`من ${days} يوم`):'لسه ماتعملتش'}</b></div>
     <div class="acts" style="margin:10px 0 0"><button class="btn" data-act="backup">⬇ نسخة احتياطية على الموبايل</button><button class="btn ghost" data-act="restore">⬆ استرجاع</button></div>
   </div>
@@ -1704,20 +1704,23 @@ const itemByName=n=>{const k=norm(n);return k?S.items.find(i=>norm(i.name)===k)|
 const lineItem=l=>(l.itemId&&find('items',l.itemId))||itemByName(l.name);
 const lineFactor=(it,l)=>it&&it.buyUnit&&num(it.buyFactor)>0&&l.unit&&norm(l.unit)===norm(it.buyUnit)?num(it.buyFactor):1;
 const _sm=new Map();
+const stockStart=()=>{const s=S.settings.find(x=>x.id==='stock');return s&&s.startDate||''};
+const afterStart=d=>{const st=stockStart();return !st||(d||'')>=st};
 function stockMoves(id){
   if(_sm.has('m'+id))return _sm.get('m'+id);
   const it=find('items',id),ev=[];if(!it)return ev;
-  if(num(it.openingQty))ev.push({date:'',ca:0,t:'رصيد أول المدة',in:num(it.openingQty),out:0,cost:num(it.openingCost)||null});
+  if(num(it.openingQty))ev.push({date:stockStart(),ca:0,t:'رصيد أول المدة (الجرد)',in:num(it.openingQty),out:0,cost:num(it.openingCost)||null});
   S.purchases.forEach(d=>(d.lines||[]).forEach(l=>{const li=lineItem(l);if(li&&li.id===id){const f=lineFactor(li,l);
     ev.push({date:d.date,ca:d.createdAt,t:`فاتورة شراء ${d.number||''} — ${nameOf('suppliers',d.supplierId)}`,in:num(l.qty)*f,out:0,cost:num(l.price)/f,act:'editPu',id:d.id})}}));
   S.sales.forEach(d=>(d.lines||[]).forEach(l=>{const li=lineItem(l);if(li&&li.id===id){const f=lineFactor(li,l);
-    ev.push({date:d.date,ca:d.createdAt,t:`فاتورة بيع ${d.number||''} — ${nameOf('customers',d.customerId)}`,in:0,out:num(l.qty)*f,cost:null,act:'editSale',id:d.id})}}));
+    ev.push({date:d.date,ca:d.createdAt,t:`فاتورة بيع ${d.number||''} — ${nameOf('customers',d.customerId)}`,in:0,out:num(l.qty)*f,cost:null,rev:num(l.qty)*num(l.price),sale:1,act:'editSale',id:d.id})}}));
   S.mfg.forEach(m=>{
     if(m.productId===id)ev.push({date:m.date,ca:m.createdAt,t:`تصنيع ${m.number||''}`,in:num(m.qty),out:0,cost:'mfg',m,act:'editMfg',id:m.id});
     (m.inputs||[]).forEach(x=>{if(x.itemId===id)ev.push({date:m.date,ca:m.createdAt,t:`صرف لتصنيع ${m.number||''} — ${nameOf('items',m.productId)}`,in:0,out:num(x.qty),cost:null,act:'editMfg',id:m.id})})});
   S.stockAdj.forEach(a=>{if(a.itemId===id){const q=num(a.qty);ev.push({date:a.date,ca:a.createdAt,t:`تسوية — ${a.reason||'جرد'}${a.note?' ('+a.note+')':''}`,in:q>0?q:0,out:q<0?-q:0,cost:q>0&&num(a.unitCost)?num(a.unitCost):null,act:'editAdj',id:a.id})}});
-  ev.sort((a,b)=>(a.date||'').localeCompare(b.date||'')||(a.ca||0)-(b.ca||0));
-  _sm.set('m'+id,ev);return ev;
+  const ev2=ev.filter(e=>e.t.startsWith('رصيد أول')||afterStart(e.date));
+  ev2.sort((a,b)=>(a.date||'').localeCompare(b.date||'')||(a.ca||0)-(b.ca||0));
+  _sm.set('m'+id,ev2);return ev2;
 }
 const stockQty=id=>{const k='q'+id;if(!_sm.has(k))_sm.set(k,r2x(sum(stockMoves(id),e=>e.in-e.out)));return _sm.get(k)};
 const r2x=n=>Math.round(n*1000)/1000;
@@ -1728,6 +1731,17 @@ function avgCost(id,depth=0){
 }
 function mfgCost(m,depth=0){const mat=sum(m.inputs||[],x=>num(x.qty)*avgCost(x.itemId,depth));return {mat,extra:num(m.extra),total:mat+num(m.extra)}}
 const mfgUnitCost=(m,depth=0)=>num(m.qty)?mfgCost(m,depth).total/num(m.qty):0;
+function itemProfit(id){const ev=stockMoves(id).filter(e=>e.sale),qty=sum(ev,e=>e.out),rev=sum(ev,e=>e.rev),cost=qty*avgCost(id);
+  return {qty,rev,cost,profit:rev-cost,margin:rev?(rev-cost)/rev*100:0,count:ev.length}}
+function profitHTML(pr){
+  const rows=S.items.map(it=>({it,p:itemProfit(it.id)})).filter(x=>x.p.count).sort((a,b)=>b.p.profit-a.p.profit);
+  if(!rows.length)return '<div class="empty">لسه مفيش مبيعات لأصناف مخزنية بعد تاريخ بداية المخزن.</div>';
+  const m=pr?fmt:money,t=k=>sum(rows,x=>x.p[k]),tr=t('rev');
+  return `<div style="overflow-x:auto"><table class="led"><thead><tr><th>الصنف</th><th>المباع</th><th>المبيعات</th><th>التكلفة</th><th>الربح</th><th>الهامش</th></tr></thead><tbody>
+    ${rows.map(({it,p})=>`<tr ${pr?'':`class="click" data-act="openItem" data-id="${esc(it.id)}"`}><td>${esc(it.name)}</td><td class="n">${fmtQ(p.qty)} ${esc(it.unit||'')}</td><td class="n">${m(p.rev)}</td><td class="n">${m(p.cost)}</td><td class="n"><b class="${p.profit<0?'neg':'pos'}">${m(p.profit)}</b></td><td class="n">${fmt(p.margin)}%</td></tr>`).join('')}
+    <tr style="font-weight:800;background:#e8efec"><td>الإجمالي</td><td></td><td class="n">${m(tr)}</td><td class="n">${m(t('cost'))}</td><td class="n">${m(t('profit'))}</td><td class="n">${fmt(tr?t('profit')/tr*100:0)}%</td></tr></tbody></table></div>
+  <div class="hint" style="margin-top:8px">المبيعات بسعر البيع قبل الخصم والضرايب. التكلفة = الكمية المباعة × متوسط تكلفة الوحدة (للمنتج المصنّع: خامات + مصاريف الأمر).</div>`;
+}
 const lowStock=it=>num(it.minQty)>0&&stockQty(it.id)<=num(it.minQty);
 function itemRow(it){const q=stockQty(it.id),c=avgCost(it.id);
   return `<button class="row" data-act="openItem" data-id="${esc(it.id)}"><div class="dot ic ${it.kind==='product'?'in':'pri'}">${I.box}</div>
@@ -1747,9 +1761,12 @@ function stockView(){
   const s=(q.stock||'').trim();
   let list=[...S.items].sort(byName);if(stockKind!=='all')list=list.filter(i=>(i.kind||'raw')===stockKind);if(s)list=list.filter(i=>norm(i.name).includes(norm(s)));
   const val=sum(S.items,i=>Math.max(0,stockQty(i.id))*avgCost(i.id)),low=S.items.filter(lowStock).length;
-  return tabs+`<div class="card hero"><div class="lbl">قيمة المخزون (بمتوسط التكلفة)</div><div class="big">${money(val)}</div>
+  const st=stockStart();
+  const startCard=st?`<div class="hint" style="margin:0 2px 10px;display:flex;justify-content:space-between;align-items:center">بداية المخزن: <b>${fdate(st)}</b> — الفواتير اللي قبله مش بتأثر على المخزن<button class="lnk" style="border:0;background:none;color:var(--pri);font-weight:700" data-act="stockStart">تعديل</button></div>`
+    :`<div class="card" style="border:1px solid var(--warn);background:var(--warn-l)"><b>حدد تاريخ بداية المخزن</b><div class="hint" style="margin:4px 0 10px">ده اليوم اللي هتعمل فيه الجرد. الفواتير اللي قبله مش هتأثر على المخزن، والجرد هو رصيد أول المدة.</div><button class="btn sm" data-act="stockStart">تحديد التاريخ</button></div>`;
+  return tabs+startCard+`<div class="card hero"><div class="lbl">قيمة المخزون (بمتوسط التكلفة)</div><div class="big">${money(val)}</div>
     <div class="sub"><span>خامات ${S.items.filter(i=>i.kind!=='product').length}</span><span>منتجات ${S.items.filter(i=>i.kind==='product').length}</span>${low?`<span>⚠ ${low} صنف قرب يخلص</span>`:''}</div></div>
-  <div class="acts"><button class="btn ghost" data-act="addAdj">⚖ تسوية / جرد</button><button class="btn ghost" data-act="addMfg">🏭 أمر تصنيع</button></div>
+  <div class="acts"><button class="btn ghost" data-act="addAdj">⚖ تسوية / جرد</button><button class="btn ghost" data-act="addMfg">🏭 أمر تصنيع</button><button class="btn ghost" data-act="profitRep">📈 الربحية</button></div>
   <div class="seg">${[['all','الكل'],['raw','الخامات'],['product','المنتجات']].map(([k,l])=>`<button data-act="skind" data-v="${k}" class="${stockKind===k?'on':''}">${l}</button>`).join('')}</div>
   <input class="search" id="srch" data-q="stock" placeholder="بحث باسم الصنف…" value="${esc(q.stock||'')}">
   <div class="list">${list.length?list.map(itemRow).join(''):`<div class="empty">${S.items.length?'مفيش نتائج.':'عرّف الأصناف (الخامات والمنتجات) من زرار +.<br>الفواتير هتحرّك المخزون لما اسم الصنف فيها يكون نفس اسم الصنف هنا.'}</div>`}</div>`;
@@ -1763,6 +1780,10 @@ function itemDetail(id){
       <div class="card hero"><div class="lbl">${KINDN[it.kind]||'خامة'} • الرصيد الحالي</div><div class="big"><span class="num">${fmtQ(q)}</span> <span style="font-size:18px">${esc(it.unit||'')}</span></div>
         <div class="sub"><span>تكلفة الوحدة ${fmt(c)}</span><span>القيمة ${fmt(Math.max(0,q)*c)}</span>${it.buyUnit?`<span>الـ${esc(it.buyUnit)} = ${fmtQ(num(it.buyFactor))} ${esc(it.unit||'')}</span>`:''}${num(it.minQty)?`<span>الحد الأدنى ${fmtQ(num(it.minQty))}</span>`:''}</div></div>
       ${q<0?'<div class="hint" style="color:var(--out)">الرصيد بالسالب: اتصرف أكتر من اللي اتسجّل دخوله. راجع فواتير الشراء أو اعمل تسوية.</div>':''}
+      ${(()=>{const p=itemProfit(id);return p.count?`<div class="box"><h4>المبيعات والربح</h4>
+        <div class="sum"><span>الكمية المباعة</span><b>${fmtQ(p.qty)} ${esc(it.unit||'')}</b></div><div class="sum"><span>إجمالي المبيعات</span><b>${money(p.rev)}</b></div>
+        <div class="sum"><span>(−) التكلفة</span><b>${money(p.cost)}</b></div><div class="sum tot"><span>الربح</span><b class="${p.profit<0?'neg':'pos'}">${money(p.profit)}</b></div>
+        <div class="sum"><span>هامش الربح</span><b>${fmt(p.margin)}%</b></div><div class="sum"><span>متوسط سعر البيع للوحدة</span><b>${money(p.qty?p.rev/p.qty:0)}</b></div></div>`:''})()}
       <div class="acts">${it.kind==='product'?`<button class="btn" data-act="addMfg" data-p="${esc(id)}">🏭 تصنيع</button>`:''}<button class="btn ghost" data-act="addAdj" data-i="${esc(id)}">⚖ تسوية / جرد</button><button class="btn ghost" data-act="editItem" data-id="${esc(id)}">تعديل</button></div>
       <h4 style="margin:6px 2px 8px">حركة الصنف</h4>
       ${rows?`<div style="overflow-x:auto"><table class="led"><thead><tr><th>التاريخ</th><th>البيان</th><th>وارد</th><th>صادر</th><th>الرصيد</th></tr></thead><tbody>${rows}</tbody></table></div><div class="hint" style="margin-top:8px">دوس على أي سطر يفتح الفاتورة أو أمر التصنيع بتاعه.</div>`:'<div class="empty">مفيش حركة لسه.</div>'}
@@ -1909,6 +1930,12 @@ const A={
   more:()=>pushSheet(moreSheet()),
   goView:d=>{closeAll();view=d.v;scrollTo(0,0);render()},
   sttab:d=>{stockTab=d.v;render()},
+  profitRep:()=>pushSheet(()=>{const b=el(`<div>${profitHTML(false)}</div>`);const pbtn=el('<button class="btn">🖨 طباعة / PDF</button>');pbtn.onclick=()=>makePdf('ربحية الأصناف',profitHTML(true),stockStart()?'من '+fdate(stockStart()):'');return{title:'ربحية الأصناف',body:b,foot:[pbtn],live:true}}),
+  stockStart:()=>pushSheet(()=>{const b=el(`<div class="form"><label>تاريخ بداية المخزن (يوم الجرد)<input type="date" name="d" value="${esc(stockStart()||today())}"></label>
+    <div class="hint">• أي فاتورة شراء أو بيع أو تصنيع <b>قبل</b> التاريخ ده مش هتأثر على المخزن (بتفضل في الحسابات عادي).<br>• رصيد أول المدة لكل صنف = الكمية اللي لقيتها في الجرد في اليوم ده.</div><div class="err"></div></div>`);
+    const s=el('<button class="btn">حفظ</button>');s.onclick=async()=>{const d=val(b,'d');if(!d){b.querySelector('.err').textContent='اختار التاريخ';return}
+      if(await run(()=>col('settings').doc('stock').set({startDate:d,updatedAt:Date.now()}))){toast('اتحفظ');popSheet()}};
+    return{title:'بداية المخزن',body:b,foot:[s]}}),
   skind:d=>{stockKind=d.v;render()},
   openItem:d=>pushSheet(itemDetail(d.id)),
   editItem:d=>{const it=find('items',d.id);it&&pushSheet(itemForm(it))},
